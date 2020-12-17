@@ -11,32 +11,8 @@ import (
 )
 
 const TimeOut = 2 * time.Second
-
-// Check the status of all the task in the map
-// and process it accordingly
-func Cleaner(tq *TaskQueue.TaskQueue) {
-	var err error
-	for _, task := range tq.Tasks {
-		switch task.Status {
-		case TaskQueue.Processing:
-			// Task in-progress
-			// Can remove the task which is in process for more than x secs/minutes
-		case TaskQueue.Completed:
-			// remove from the queue
-			err = ProcessCompletedTask(tq, task.Id)
-		case TaskQueue.Failed:
-			// remove from the queue and retry if not timeout
-			err = ProcessFailedTask(tq, task.Id)
-		case TaskQueue.Timeout:
-			// remove from the queue and log
-			err = ProcessTimedOutTask(tq, task.Id)
-		}
-		if err != nil {
-			logrus.Errorln("Error : ", err)
-		}
-	}
-
-}
+const QueueSize = 50
+const TotalTaskToAdd = 100
 
 // Remove the task from map
 func ProcessCompletedTask(tq *TaskQueue.TaskQueue, id string) error {
@@ -80,20 +56,30 @@ func ProcessTimedOutTask(tq *TaskQueue.TaskQueue, id string) error {
 	return nil
 }
 
-// Pull data from the queue channel
-// and process the task
-func Executor(tq *TaskQueue.TaskQueue) {
-	logrus.Infoln("Worker started")
-	for taskId := range tq.Queue {
-		err := tq.UpdateStatus(taskId, TaskQueue.Processing)
-		if err != nil {
-			logrus.Errorln("worker error updating the status to processing, Error ", err)
+// Check the status of all the task in the map
+// and process it accordingly
+func Cleaner(tq *TaskQueue.TaskQueue) {
+	var err error
+	for _, task := range tq.Tasks {
+		switch task.Status {
+		case TaskQueue.Processing:
+			// Task in-progress
+			// Can remove the task which is in process for more than x secs/minutes
+		case TaskQueue.Completed:
+			// remove from the queue
+			err = ProcessCompletedTask(tq, task.Id)
+		case TaskQueue.Failed:
+			// remove from the queue and retry if not timeout
+			err = ProcessFailedTask(tq, task.Id)
+		case TaskQueue.Timeout:
+			// remove from the queue and log
+			err = ProcessTimedOutTask(tq, task.Id)
 		}
-		err = ProcessTask(tq, taskId)
 		if err != nil {
-			logrus.Errorln("worker error processing the Task, Error : ", err)
+			logrus.Errorln("Error : ", err)
 		}
 	}
+
 }
 
 // Process the task
@@ -119,8 +105,24 @@ func ProcessTask(tq *TaskQueue.TaskQueue, taskId string) error {
 	return nil
 }
 
+// Pull data from the channel queue
+// and process the task
+func Executor(tq *TaskQueue.TaskQueue) {
+	logrus.Infoln("Worker started")
+	for taskId := range tq.Queue {
+		err := tq.UpdateStatus(taskId, TaskQueue.Processing)
+		if err != nil {
+			logrus.Errorln("worker error updating the status to processing, Error ", err)
+		}
+		err = ProcessTask(tq, taskId)
+		if err != nil {
+			logrus.Errorln("worker error processing the Task, Error : ", err)
+		}
+	}
+}
+
 func Adder(tq *TaskQueue.TaskQueue) {
-	for i := 0; i < 10; i++ {
+	for i := 0; i < TotalTaskToAdd; i++ {
 		task := TaskQueue.Task{
 			Id:           strconv.Itoa(i),
 			Status:       TaskQueue.Untouched,
@@ -140,7 +142,7 @@ func Adder(tq *TaskQueue.TaskQueue) {
 
 func main() {
 	taskQueue := TaskQueue.TaskQueue{}
-	taskQueue.Init(50)
+	taskQueue.Init(QueueSize)
 
 	// start clean up go-routine
 	go func() {
@@ -155,8 +157,7 @@ func main() {
 		Executor(&taskQueue)
 	}()
 
-	// start producer
-	// can run this in go routine to push new task in the queue (just need to call AddNewTask function)
+	// start Adder
 	go func() {
 		Adder(&taskQueue)
 	}()
