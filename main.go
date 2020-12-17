@@ -19,7 +19,7 @@ const (
 	Timeout    = "timeout"
 )
 
-const TimeOut = 2 * time.Second
+const TimeOut = 1 * time.Second
 
 type Task struct {
 	Id           string
