@@ -12,7 +12,6 @@ import (
 
 const TimeOut = 2 * time.Second
 
-
 // Check the status of all the task in the map
 // and process it accordingly
 func Cleaner(tq *TaskQueue.TaskQueue) {
@@ -81,8 +80,6 @@ func ProcessTimedOutTask(tq *TaskQueue.TaskQueue, id string) error {
 	return nil
 }
 
-
-
 // Pull data from the queue channel
 // and process the task
 func Executor(tq *TaskQueue.TaskQueue) {
@@ -122,6 +119,25 @@ func ProcessTask(tq *TaskQueue.TaskQueue, taskId string) error {
 	return nil
 }
 
+func Adder(tq *TaskQueue.TaskQueue) {
+	for i := 0; i < 10; i++ {
+		task := TaskQueue.Task{
+			Id:           strconv.Itoa(i),
+			Status:       TaskQueue.Untouched,
+			CreationTime: time.Now(),
+			TaskData:     string(i),
+		}
+		err := tq.AddNewTask(task)
+		if err != nil {
+			logrus.Errorln("Error adding new task, Err : ", err)
+		}
+
+		randomInt := rand.Intn(1)
+		sleepTime := time.Duration(int64(randomInt)) * time.Second
+		time.Sleep(sleepTime)
+	}
+}
+
 func main() {
 	taskQueue := TaskQueue.TaskQueue{}
 	taskQueue.Init(50)
@@ -141,22 +157,9 @@ func main() {
 
 	// start producer
 	// can run this in go routine to push new task in the queue (just need to call AddNewTask function)
-	for i := 0; i < 10; i++ {
-		task := TaskQueue.Task{
-			Id:           strconv.Itoa(i),
-			Status:       TaskQueue.Untouched,
-			CreationTime: time.Now(),
-			TaskData:     string(i),
-		}
-		err := taskQueue.AddNewTask(task)
-		if err != nil {
-			logrus.Errorln("Error adding new task, Err : ", err)
-		}
-
-		randomInt := rand.Intn(1)
-		sleepTime := time.Duration(int64(randomInt)) * time.Second
-		time.Sleep(sleepTime)
-	}
+	go func() {
+		Adder(&taskQueue)
+	}()
 
 	select {}
 
